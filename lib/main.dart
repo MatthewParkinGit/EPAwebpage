@@ -4,10 +4,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:matty_app/new_version.dart';
+// ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 import 'package:xml/xml.dart';
 import 'package:file_picker/file_picker.dart';
+
+import 'kml.dart';
 
 void main() {
   runApp(const MyApp());
@@ -29,130 +31,348 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
-  final String title;
+class KMLgrid extends StatefulWidget {
+  const KMLgrid({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<KMLgrid> createState() => _KMLgridState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  List<String> kmlDownloadList = [];
-  List<String> kmlDownloadTitle = [];
-
-  void parseKml(String kmlContent) {
-    final document = XmlDocument.parse(kmlContent);
-    final coordinates = document.findAllElements('coordinates');
-    List<String> coordinatesList = [];
-    for (var coordinate in coordinates) {
-      coordinatesList.add(coordinate.text.trim());
+class _KMLgridState extends State<KMLgrid> {
+  XmlElement? getFirstElement(XmlElement element, String query) {
+    final elements = element.findElements(query);
+    if (elements.isNotEmpty) {
+      return elements.first;
     }
-    final blob = html.Blob([coordinatesList.join('\n')]);
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    setState(() {
-      kmlDownloadList.add(url);
-    });
+    return null;
   }
 
-  void downloadFile(String url, String filename) {
+  Kml parseKml(String kmlContent, String fileName) {
+    final document = XmlDocument.parse(kmlContent);
+    final placemarks = document.findAllElements('Placemark');
+    List<Map<String, dynamic>> coordinatesList = [];
+    for (var placemark in placemarks) {
+      var name = placemark.findElements('name').first.text;
+      // ignore: prefer_typing_uninitialized_variables
+      var coordinatesNode;
+      var points = placemark.findElements('Point');
+      if (points.isNotEmpty) {
+        coordinatesNode = points.first.findElements('coordinates').first;
+      }
+      var polygons = placemark.findElements('Polygon');
+      if (coordinatesNode == null && polygons.isNotEmpty) {
+        coordinatesNode = polygons.first
+            .findElements('outerBoundaryIs')
+            .first
+            .findElements('LinearRing')
+            .first
+            .findElements('coordinates')
+            .first;
+      }
+      var linestrings = placemark.findElements('LineString');
+      if (coordinatesNode == null && linestrings.isNotEmpty) {
+        coordinatesNode = linestrings.first.findElements('coordinates').first;
+      }
+      if (coordinatesNode != null) {
+        var coordinateStrings = coordinatesNode.text
+            .trim()
+            .split('\n')
+            .map((e) => e.trim().replaceAll('\r', ''))
+            .map((e) {
+          var parts = e.split(',');
+          if (parts.last == '0') parts.removeLast(); // Check before removing
+          return parts.join(' ');
+        }).join(' '); // Join all coordinates into a single string
+        coordinatesList.add({name: coordinateStrings});
+      }
+    }
+    final jsonBlob = html.Blob([jsonEncode(coordinatesList)]);
+    final url = html.Url.createObjectUrlFromBlob(jsonBlob);
+
+    Kml newKml =
+        Kml(fileName: fileName, url: url, coordinatesList: coordinatesList);
+    return newKml;
+  }
+
+  void downloadFile(String url, String filename, String fileExtension) {
     final anchor = html.AnchorElement(
       href: url,
     )
-      ..setAttribute("download", filename)
+      ..setAttribute("download", filename + fileExtension)
       ..click();
   }
+
+  List<Kml> selectedKmls = [];
+  List<Kml> kmlList = [];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-          backgroundColor: Colors.blue,
-          child: const Icon(
-            Icons.add,
-            color: Colors.white,
-          ),
-          onPressed: () {
-            showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text(
-                  "Select a KML file",
-                  style: TextStyle(fontWeight: FontWeight.w400),
-                ),
-                content: SizedBox(
-                  height: 250,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      GestureDetector(
-                        onTap: () async {
+      appBar: AppBar(
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.white,
+        title: const Text(
+          "KML Convertor Matthew Parkin",
+          style: TextStyle(
+              fontWeight: FontWeight.w400, fontSize: 30, color: Colors.black),
+        ),
+        bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(100),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(
+                      width: 30,
+                    ),
+                    ElevatedButton(
+                        child: const Row(children: [
+                          Icon(
+                            Icons.add,
+                            color: Colors.white,
+                          ),
+                          Text("Upload"),
+                        ]),
+                        onPressed: () async {
                           FilePickerResult? result =
-                              await FilePicker.platform.pickFiles();
+                              await FilePicker.platform.pickFiles(
+                            type: FileType.custom,
+                            allowedExtensions: ['kml'],
+                          );
                           if (result != null) {
                             Uint8List fileBytes = result.files.first.bytes!;
                             String kmlContent = utf8.decode(fileBytes);
-                            parseKml(kmlContent);
-                            Navigator.pop(context);
+                            String fileName = result.files.first.name;
+                            Kml newKml = parseKml(kmlContent, fileName);
+                            setState(() {
+                              kmlList.add(newKml);
+                            });
                           }
-                        },
-                        child: const Icon(
-                          Icons.upload_file,
-                          color: Colors.blue,
-                          size: 100,
+                        }),
+                    const SizedBox(
+                      width: 60,
+                    ),
+                    ElevatedButton(
+                        onPressed: selectedKmls.isNotEmpty
+                            ? () {
+                                if (selectedKmls.length > 1) {
+                                  Map<String, List<Map<String, dynamic>>>
+                                      output = {
+                                    for (var kml in selectedKmls)
+                                      kml.fileName: kml.coordinatesList
+                                  };
+                                  final urlblob =
+                                      html.Blob([jsonEncode(output)]);
+                                  final url =
+                                      html.Url.createObjectUrlFromBlob(urlblob);
+                                  downloadFile(url, "ConvertKMLs", ".txt");
+                                } else {
+                                  for (int i = 0;
+                                      i < selectedKmls.length;
+                                      i++) {
+                                    downloadFile(selectedKmls[i].url,
+                                        selectedKmls[i].fileName, ".txt");
+                                  }
+                                }
+                                setState(() {
+                                  selectedKmls.clear();
+                                });
+                              }
+                            : null,
+                        child: const Row(children: [
+                          Icon(
+                            CupertinoIcons.arrow_down_to_line,
+                          ),
+                          SizedBox(
+                            width: 10,
+                          ),
+                          Text(
+                            "Export as Text",
+                          ),
+                        ])),
+                    const SizedBox(
+                      width: 60,
+                    ),
+                    ElevatedButton(
+                      onPressed: selectedKmls.isNotEmpty
+                          ? () {
+                              if (selectedKmls.length > 1) {
+                                Map<String, List<Map<String, dynamic>>> output =
+                                    {
+                                  for (var kml in selectedKmls)
+                                    kml.fileName: kml.coordinatesList
+                                };
+                                final urlblob = html.Blob([jsonEncode(output)]);
+                                final url =
+                                    html.Url.createObjectUrlFromBlob(urlblob);
+                                downloadFile(url, "ConvertKMLs", ".json");
+                              } else {
+                                for (int i = 0; i < selectedKmls.length; i++) {
+                                  downloadFile(selectedKmls[i].url,
+                                      selectedKmls[i].fileName, ".json");
+                                }
+                              }
+                              setState(() {
+                                selectedKmls.clear();
+                              });
+                            }
+                          : null,
+                      child: const Row(children: [
+                        Icon(
+                          Icons.file_open_outlined,
+                        ),
+                        SizedBox(
+                          width: 10,
+                        ),
+                        Text(
+                          "Export as JSON",
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(
+                      width: 60,
+                    ),
+                    ElevatedButton(
+                      onPressed: selectedKmls.isNotEmpty
+                          ? () {
+                              for (int i = 0; i < selectedKmls.length; i++) {
+                                setState(() {
+                                  kmlList.remove(selectedKmls[i]);
+                                });
+                              }
+                              setState(() {
+                                selectedKmls.clear();
+                              });
+                            }
+                          : null,
+                      child: const Row(children: [
+                        Icon(
+                          Icons.clear,
+                        ),
+                        SizedBox(
+                          width: 10,
+                        ),
+                        Text(
+                          "Remove",
+                        ),
+                      ]),
+                    )
+                  ],
+                ),
+              ),
+            )),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.only(left: 30, top: 50),
+        child: kmlList.isEmpty
+            ? Center(
+                child: Container(
+                  height: 600,
+                  width: MediaQuery.of(context).size.width * 0.5,
+                  decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.white),
+                  child: const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.upload_file_outlined,
+                          size: 120,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(
+                          height: 20,
+                        ),
+                        Text(
+                          "No Files Uploaded",
+                          style: TextStyle(
+                            fontWeight: FontWeight.w400,
+                            fontSize: 24,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            : Center(
+                child: Container(
+                  height: 600,
+                  width: MediaQuery.of(context).size.width * 0.5,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const SizedBox(
+                        height: 50,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 50, right: 50),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              "Uploaded KML",
+                              style: TextStyle(
+                                  fontSize: 22, fontWeight: FontWeight.w400),
+                            ),
+                            GestureDetector(
+                                child: Text("Clear Selection",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: selectedKmls.isEmpty
+                                          ? Colors.grey
+                                          : Colors.blue,
+                                    )),
+                                onTap: () {
+                                  setState(() {
+                                    selectedKmls.clear();
+                                  });
+                                })
+                          ],
                         ),
                       ),
-                      CupertinoButton.filled(
-                          child: const Text("Upload"),
-                          onPressed: () {
-                            Navigator.pop(context);
-                          })
+                      const SizedBox(
+                        height: 20,
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: kmlList.length,
+                          itemBuilder: (context, index) => Padding(
+                            padding: const EdgeInsets.only(left: 30, right: 30),
+                            child: ListTile(
+                              leading: selectedKmls.contains(kmlList[index])
+                                  ? const Icon(
+                                      Icons.check_circle_rounded,
+                                      color: Colors.blue,
+                                    )
+                                  : const Icon(Icons.circle_outlined),
+                              title: Text(
+                                kmlList[index].fileName,
+                              ),
+                              onTap: () {
+                                setState(() {
+                                  selectedKmls.contains(kmlList[index])
+                                      ? selectedKmls.remove(kmlList[index])
+                                      : selectedKmls.add(kmlList[index]);
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
-            );
-          }),
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.secondary,
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Padding(
-              padding: EdgeInsets.only(left: 20),
-              child: Text(
-                "Converted KMLs",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w400),
-              ),
-            ),
-            const SizedBox(
-              height: 20,
-            ),
-            ListView.builder(
-              shrinkWrap: true,
-              itemCount: kmlDownloadList.length,
-              itemBuilder: (context, index) => Padding(
-                padding: const EdgeInsets.only(left: 30, right: 30),
-                child: ListTile(
-                  trailing: const Icon(
-                    CupertinoIcons.arrow_down_to_line_alt,
-                    color: Colors.blue,
-                  ),
-                  title: Text(
-                    'Download KML ${index + 1}',
-                  ),
-                  onTap: () {
-                    downloadFile(
-                        kmlDownloadList[index], 'coordinates${index + 1}.txt');
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
