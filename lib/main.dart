@@ -8,7 +8,6 @@ import 'package:flutter/cupertino.dart';
 import 'dart:html' as html;
 import 'package:xml/xml.dart';
 import 'package:file_picker/file_picker.dart';
-
 import 'kml.dart';
 
 void main() {
@@ -113,7 +112,7 @@ class _KMLgridState extends State<KMLgrid> {
         elevation: 0,
         backgroundColor: Colors.white,
         title: const Text(
-          "KML Convertor Matthew Parkin",
+          "KML Convertor Matthew Parkin 14:17",
           style: TextStyle(
               fontWeight: FontWeight.w400, fontSize: 30, color: Colors.black),
         ),
