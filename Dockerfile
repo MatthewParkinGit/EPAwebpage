@@ -11,7 +11,7 @@ ENV PATH="${PATH}:/usr/local/flutter/bin:/usr/local/flutter/bin/cache/dart-sdk/b
 # Run flutter doctor
 RUN flutter doctor -v
 RUN flutter channel master
-RUN flutter upgrade
+RUN flutter upgrade --force
 # Copy files to container and build
 RUN mkdir /app/
 COPY . /app/
