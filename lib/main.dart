@@ -2,15 +2,23 @@
 
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:matty_app/auth.dart';
+import 'package:matty_app/firebase_options.dart';
+import 'package:matty_app/login.dart';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 import 'package:xml/xml.dart';
 import 'package:file_picker/file_picker.dart';
+
 import 'kml.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MyApp());
 }
 
@@ -22,11 +30,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'Flutter Demo',
+        title: 'KML Parser',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         ),
-        home: const KMLgrid());
+        home: const AuthPage());
   }
 }
 
@@ -38,6 +46,10 @@ class KMLgrid extends StatefulWidget {
 }
 
 class _KMLgridState extends State<KMLgrid> {
+  void signOut() {
+    FirebaseAuth.instance.signOut();
+  }
+
   XmlElement? getFirstElement(XmlElement element, String query) {
     final elements = element.findElements(query);
     if (elements.isNotEmpty) {
@@ -104,6 +116,8 @@ class _KMLgridState extends State<KMLgrid> {
   List<Kml> selectedKmls = [];
   List<Kml> kmlList = [];
 
+  final user = FirebaseAuth.instance.currentUser;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -111,11 +125,19 @@ class _KMLgridState extends State<KMLgrid> {
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.white,
-        title: const Text(
-          "KML Convertor Matthew Parkin 14:17",
-          style: TextStyle(
+        title: Text(
+          "KML Convertor, ${user!.email}",
+          style: const TextStyle(
               fontWeight: FontWeight.w400, fontSize: 30, color: Colors.black),
         ),
+        actions: [
+          CupertinoButton(
+              onPressed: signOut,
+              child: const Icon(
+                Icons.logout,
+                color: Colors.black,
+              ))
+        ],
         bottom: PreferredSize(
             preferredSize: const Size.fromHeight(100),
             child: Padding(

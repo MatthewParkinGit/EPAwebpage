@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "63283006247",
+    "project_id": "epawebpage",
+    "storage_bucket": "epawebpage.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:63283006247:android:5bcbff64ee02c68660f702",
+        "android_client_info": {
+          "package_name": "com.example.matty_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBI4inX3bEL18dcvvC4j3w_cbENQMXurKg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
