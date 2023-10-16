@@ -40,8 +40,44 @@ class _MyWidgetState extends State<LoginPage> {
     }
   }
 
+  void resetPassword() async {
+    showDialog(
+      context: context,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      await FirebaseAuth.instance
+          .sendPasswordResetEmail(email: emailResetController.text.trim());
+      Navigator.pop(context);
+      Navigator.pop(context);
+      showDialog(
+        context: context,
+        builder: (context) => Center(
+            child: Container(
+                height: 55,
+                width: 100,
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12)),
+                child: Text("Password reset link sent."))),
+      );
+    } on FirebaseAuthException catch (e) {
+      Navigator.pop(context);
+      showDialog(
+        context: context,
+        builder: (context) => Center(
+            child: Text(
+                "No account under with the email ${emailController.text} exists.")),
+      );
+    }
+  }
+
   TextEditingController emailController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
+  TextEditingController emailResetController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -92,15 +128,124 @@ class _MyWidgetState extends State<LoginPage> {
                   height: 10,
                 ),
                 GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text("Password Reset"),
+                          content: SizedBox(
+                            width: 200,
+                            height: 100,
+                            child: Column(
+                              children: [
+                                TextField(
+                                  decoration: const InputDecoration(
+                                      hintText: "Email Address"),
+                                  keyboardType: TextInputType.emailAddress,
+                                  maxLines: 1,
+                                  controller: emailResetController,
+                                ),
+                              ],
+                            ),
+                          ),
+                          actions: [
+                            CupertinoButton(
+                                child: Text("Send"),
+                                onPressed: () {
+                                  if (emailResetController.text
+                                      .trim()
+                                      .isNotEmpty) {
+                                    resetPassword();
+                                  } else {}
+                                })
+                          ],
+                        ),
+                      );
+
+                      /*
+                      showDialog(
+                        context: context,
+                        builder: (context) => Container(
+                          decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12)),
+                          height: 100,
+                          width: 200,
+                          child: Column(
+                            children: [
+                              const Text("Enter reset password link"),
+                              TextField(
+                                decoration: const InputDecoration(
+                                    hintText: "Email Address"),
+                                keyboardType: TextInputType.emailAddress,
+                                maxLines: 1,
+                                controller: emailResetController,
+                              ),
+                              CupertinoButton(
+                                  child: const Text("Send reset email"),
+                                  onPressed: () async {
+                                    if (emailController.text.trim().isEmpty) {
+                                      return;
+                                    }
+
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => const Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    );
+                                    try {
+                                      await FirebaseAuth.instance
+                                          .sendPasswordResetEmail(
+                                              email: emailResetController.text);
+                                      Navigator.pop(context);
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) => Center(
+                                            child: Container(
+                                          decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius:
+                                                  BorderRadius.circular(12)),
+                                          height: 100,
+                                          width: 100,
+                                          child: const Text(
+                                              "Password reset link sent"),
+                                        )),
+                                      );
+                                    } catch (e) {
+                                      Navigator.pop(context);
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) => Center(
+                                            child: Container(
+                                          decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius:
+                                                  BorderRadius.circular(12)),
+                                          height: 100,
+                                          width: 100,
+                                          child: const Text(
+                                              "No account exists with that email"),
+                                        )),
+                                      );
+                                    }
+                                  })
+                            ],
+                          ),
+                        ),
+                      );
+                      */
+                    },
                     child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      "Forgot password?",
-                      style: TextStyle(color: Colors.blue),
-                    ),
-                  ],
-                )),
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          "Forgot password?",
+                          style: TextStyle(color: Colors.blue),
+                        ),
+                      ],
+                    )),
                 const SizedBox(
                   height: 40,
                 ),
